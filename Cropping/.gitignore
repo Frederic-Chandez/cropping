@@ -1,0 +1,13 @@
+﻿target
+/target/
+.project
+.classpath
+.settings
+/macros
+gdsc-smlm-ij/plugins
+*.lut
+JumpDistanceAnalysisTest.dat
+/gdsc.smlm.settings.xml
+/luts
+/.checkstyle
+docs/_build/

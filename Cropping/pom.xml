@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+		http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- clean verify -Denforcer.skip -->
+	
+  <parent> 
+	<groupId>org.scijava</groupId>
+	<artifactId>pom-scijava</artifactId>
+	<version>30.0.0</version>
+	<relativePath/>
+  </parent>
+    
+  <groupId>sc.fiji</groupId>
+  <artifactId>CroppingJ</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+	<license.licenseName>Fred</license.licenseName>
+	<license.copyrightOwners>Chandez</license.copyrightOwners>
+  </properties>
+  
+	<!--  More Project Information -->
+	
+  	<!--  
+  		Projects wishing to use pom-scijava as a parent project need to override the sections :
+  		name, description, url, inceptionYear, organization, licenses, developers, 
+  		contributors, mailingLists, scm, issueManagement and ciManagement 
+  	-->
+	
+	<name>Nucleus cropping</name>
+  	<description>Maven project implementing an ImageJ plugin for nuclear analysis</description>
+  	
+	<url>None</url>
+	<inceptionYear>2022</inceptionYear>
+	<organization>
+		<name>LPC</name>
+		<url>//clrwww.in2p3.fr/</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>Unlicense</name>
+			<url>https://unlicense.org/</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+	<developers>
+		<developer>
+			<id>fchandez</id>
+			<name>Frederic Chandez</name>
+			<url>None</url>
+			<roles>
+				<role>developer</role>
+				<role>support</role>
+			</roles>
+		</developer>
+	</developers>
+	<contributors>
+		<contributor>
+			<name>None</name>
+		</contributor>
+	</contributors>
+	<mailingLists>
+		<mailingList>
+			<name>frederic.chandez@clermont.in2p3.fr</name>
+		</mailingList>
+	</mailingLists>
+	<scm>
+		<connection>scm:git:https://github.com/cropping</connection>
+		<developerConnection>scm:git:git@github.com/cropping</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/fredericChandez/cropping</url>
+	</scm>
+	<issueManagement>
+		<system>None</system>
+	</issueManagement>
+	<ciManagement>
+		<system>None</system>
+	</ciManagement>
+
+	<!--  
+		Ajout des dependances 
+	-->
+	
+	<dependencies>
+		<!-- https://mvnrepository.com/artifact/net.imagej/ij -->
+		<dependency>
+		    <groupId>net.imagej</groupId>
+		    <artifactId>ij</artifactId>
+		</dependency>
+	
+	<!-- Declares logback-classic, it will pull in the logback-core and slf4j-api  -->
+
+	<!-- This single dependency is enough, as it will transitively pull in the logback-core and slf4j-api dependencies. -->
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+		<!-- 
+		</dependency>
+				<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		-->
+
+		<!-- Ajout 'org.apache.commons.io.FilenameUtils'  -->
+		<!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<!-- <version>2.6</version> -->
+		</dependency>
+		
+		<!-- Ajout 'MorphoLibJ'  -->
+		<!-- https://mvnrepository.com/artifact/fr.inra.ijpb/MorphoLibJ_ -->
+<!-- 
+		<dependency>
+			<groupId>com.github.ijpb</groupId>
+			<artifactId>MorphoLibJ</artifactId>
+			<version>1.4.0</version>
+		</dependency>
+ -->		
+		<!--  Java Matrix Packag necessaire au calcul du moment d'inertie -->
+		<!-- https://mvnrepository.com/artifact/gov.nist.math/jama -->
+ 		
+		<dependency>
+			<groupId>gov.nist.math</groupId>
+			<artifactId>jama</artifactId>
+			<!-- <version>1.0.3</version>  -->
+		</dependency>
+	
+		<!-- https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-api -->
+		<!--  JUnit pour tests unitaires -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<!--  <version>5.7.1</version>  -->
+			<scope>test</scope>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/ome/bioformats_plugins -->
+		<dependency>
+			<groupId>ome</groupId>
+			<artifactId>bio-formats_plugins</artifactId>
+		</dependency>	
+		 
+		<!-- https://mvnrepository.com/artifact/ome/formats-api -->
+		<dependency>
+			<groupId>ome</groupId>
+			<artifactId>formats-api</artifactId>		
+		</dependency>
+				    	
+		<!-- https://mvnrepository.com/artifact/ome/formats-api -->
+		<!-- <dependency>
+			<groupId>ome</groupId>
+			<artifactId>formats-gpl</artifactId>
+		</dependency>		
+ 		 -->
+ 	    
+	</dependencies>
+	
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<!-- 
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>plugins/Cropping_</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+				-->
+			</plugin>
+						
+			<!--  Duplique le plugin pour changer de version SDK JAVA -->
+			<!-- 	
+			<plugin>
+		        <artifactId>maven-compiler-plugin</artifactId>
+		        <configuration>
+		          <source>1.8</source>
+		          <target>1.8</target>
+		        </configuration>
+      		</plugin>
+      		-->
+		</plugins>		
+	</build>	
+	
+	<!-- Ajout 'MorphoLibJ'  -->
+	<repositories>
+	 
+		<repository>
+			<id>imagej.public</id>
+			<url>https://maven.imagej.net/content/groups/public</url>
+		</repository>
+	 <!--		
+		<repository>
+			<id>gred-releases</id>
+			<url>https://artifacts.igred.fr/releases</url>
+		</repository>
+	-->	
+	</repositories>
+	
+</project>

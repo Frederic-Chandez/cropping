@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration  debug="true">
+<contextName>Test</contextName>
+<!--
+There are three valid standard file names you can choose from:
+    logback-test.xml (TEST_AUTOCONFIG_FILE = "logback-test.xml";)
+    logback.groovy
+    logback.xml
+    
+    Chaque appender gere son propre type de log avec une interface specifique
+     ConsoleAppender 	 – writes messages to the system console
+     FileAppender 		 – appends messages to a file
+     RollingFileAppender – extends the FileAppender with the ability to roll over log files
+     SMTPAppender 		 – sends log messages in an email, by default only for ERROR messages
+     DBAppender 		 – adds log events to a database
+     SiftingAppender 	 – separates logs based on a runtime attribute
+
+-->
+	<property resource="application.properties" />
+	<!-- <property name="directory" value="c:/temp" /> -->
+	<!-- <property name="fileName" value="testFile.log" /> -->
+  
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>${directory}/${filename}</file>
+        <encoder>   
+        	<pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+         </encoder>
+    </appender>
+    
+    <!-- target : System.out p/dft Logging data will be printed to Eclipse Console -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>   
+            <Pattern>
+                <!-- %d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n -->
+                %d %green([%thread]) %highlight(%level) %logger{50} - %msg%n
+            </Pattern>
+        </encoder>   
+    </appender>
+   
+   	<!-- 
+   	  Loggers : developers can use to log messages at a certain level.
+	--> 
+    <root level="error">
+    	<appender-ref ref="CONSOLE" />
+    </root>
+      <root level="info" name="FILE">
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>
+
+<!--
+    <logger name="lpc.nucleus.plugins" level="debug" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+	<logger name="loci.formats" level="warn" />
+	<logger name="ome.formats" level="warn" />
+-->	
