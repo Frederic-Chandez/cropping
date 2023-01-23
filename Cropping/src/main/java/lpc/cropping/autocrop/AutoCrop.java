@@ -13,7 +13,13 @@ import org.slf4j.LoggerFactory;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.plugin.ChannelSplitter;
-
+import ij.plugin.ContrastEnhancer;
+import ij.plugin.GaussianBlur3D;
+import ij.process.AutoThresholder;
+import ij.process.ImageConverter;
+import ij.process.ImageStatistics;
+import ij.process.StackConverter;
+import ij.process.StackStatistics;
 import loci.formats.FormatException;
 import loci.plugins.BF;
 import loci.plugins.in.ImporterOptions; // Helper class for managing Bio-Formats Importer options
@@ -38,13 +44,20 @@ public class AutoCrop {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Cropping_.class);
 	
 	/** Logger LOG4J */
-
-	private final String 	outputDirPath; /** the path of the directory where are saved the crop of the object */
-	private final AutocropParameters autocropParameters; /** Parameters crop analyse */
-	private ImagePlus       rawImg; 			/** Raw image */
-	private String          imageFilePath; 		/** The path of the image to be processed */
-	File 					currentFile; 		/** File to process (Image input) */
-
+	
+	private final AutocropParameters autocropParameters; /* Parameters crop analyse */
+	private final String 	outputDirPath; /* the path of the directory where are saved the crop of the object */
+	private ImagePlus       rawImg; /* Raw image */	
+	private ImagePlus[]     currentImage; /* Current image for BF */
+	private ImagePlus 		imageSeg; /* Segmented image */
+	private String          imageFilePath; /* The path of the image to be processed */
+	File 					currentFile; /* File to process (Image input) */
+	int 					channelNumbers = 1; /* Number of channels in current image */	
+	
+	/* Classe AutocropParameters */
+	int     				channelToComputeThreshold = 0; /* Channel to compute OTSU threshold */	
+	private int     		thresholdOTSUComputing = 20;/* Minimal default OTSU threshold */
+	
 	/**
 	 * Autocrop constructor : initialisation of analyse parameter
 	 *  - imageFile                 Current image analyse
@@ -67,50 +80,44 @@ public class AutoCrop {
 		// logging level to INFO, WARN or ERROR
 		//DebugTools.setRootLevel("OFF");
 
+/* AutoCrop.java NucleusJ2
+ * 
+ * 	public AutoCrop(File imageFile, String outputFilesPrefix, AutocropParameters autocropParametersAnalyse)
+	throws IOException, FormatException {
+        this.autocropParameters = autocropParametersAnalyse;
+		this.currentFile = imageFile;
+		this.imageFilePath = imageFile.getAbsolutePath();
+		this.outputDirPath = this.autocropParameters.getOutputFolder();
+		this.outputFilesPrefix = outputFilesPrefix;
+		setChannelNumbers();
+		if (this.rawImg.getBitDepth() > 8) {
+			this.imageSeg =
+				Thresholding.contrastAnd8bits(getImageChannel(this.autocropParameters.getChannelToComputeThreshold()));
+		} else {
+			this.imageSeg = 
+				getImageChannel(this.autocropParameters.getChannelToComputeThreshold());
+		}
+		this.infoImageAnalysis = autocropParametersAnalyse.getAnalysisParameters();
+	}
+*/	
 		this.autocropParameters = autocropParametersAnalyse;
 		this.currentFile = imageFile;
 		this.imageFilePath = imageFile.getAbsolutePath();
 		this.outputDirPath = this.autocropParameters.getOutputFolder();
-
+		
 		// Use a dialog box with ImageJ
 		//ImagePlus imp = IJ.openImage(this.imageFilePath);
 		//ImagePlus imp = new Opener().openImage(this.imageFilePath);
-        ImagePlus[] imps = null;
-
-        // Bio-Formats ImporterOptions controle les otions d'ouverture des images
-        System.out.println("Bio-Formats ImporterOptions");
-        try {
-         System.out.println("Trying LOCI Import Image in AutoCrop constructor");
-         // Bio-Formats Import Options
-
-         ImporterOptions options = new ImporterOptions();
-         //options.setId(this.imageFilePath);
-         options.setId("‪C:\\Users\\frede\\Desktop\\2013-01-18-crwn12-102_GC1.tif");
-         options.setAutoscale(false);
-         //options.setStackFormat(ImporterOptions.VIEW_HYPERSTACK);
-         //options.setStackOrder(ImporterOptions.ORDER_XYCZT);
-         //options.setColorMode(ImporterOptions.COLOR_MODE_DEFAULT);
-         //options.setColorMode(ImporterOptions.COLOR_MODE_COMPOSITE);
-         //options.setCrop(true);
-         //options.setVirtual(virtual);
-         //options.setGroupFiles(true);
-         //imps = BF.openImagePlus(options); // ou BF.openImagePlus(this.imageFilePath);
-         imps = BF.openImagePlus(this.imageFilePath);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-        catch (FormatException e) {
-           e.printStackTrace();
-        }
 
         // Information about the image : Detection Number of channels in this images.
-		ImagePlus[] currentImage = BF.openImagePlus(this.imageFilePath);
+		currentImage = openBFImagePlus(this.imageFilePath); // BF.openImagePlus
 
+		// setChannelNumbers() : check multichannel and initialising channelNumbers variable	
 		// length > 1 : c0,c1,...
-		int channelNumbers = ChannelSplitter.split(imps[0]).length; // separe les canaux de la 1ere image de la stack
+		// Cette ligne remplace la methode "setChannelNumbers()" : calcule du nb de canaux dans l'image
+		int channelNumbers = ChannelSplitter.split(currentImage[0]).length; // separe les canaux de la 1ere image de la stack
 
-        this.rawImg = imps[0];
+        this.rawImg = currentImage[0];
 		int width = this.rawImg.getWidth();
 	    int height = this.rawImg.getHeight();
 	    int nslices = this.rawImg.getStackSize();
@@ -135,7 +142,7 @@ public class AutoCrop {
 		this.rawImg.show();
 
 		// Ouverture sans bio-format (ImageJ)
-		//getImage().show();
+		getImage().show();
 
 		if (this.rawImg.getNDimensions() > 3) { // Nb de dimensions (2,3,4,5)
 		    IJ.error("3D stacks are currently not supported");
@@ -143,14 +150,167 @@ public class AutoCrop {
 		} else
 			IJ.error(imtitle+" is a accepted 3D stack.");
 
-		if (imps[0].isComposite()) { // image multi-canaux
-		    int z = imps[0].getSlice();
+		if (currentImage[0].isComposite()) { // image multi-canaux
+		    int z = currentImage[0].getSlice();
 		    System.out.println("Number of Channels = " + z);
 		    }
 		else
-			  IJ.error("Split Channels", "Multichannel image required");
+			IJ.error("Split Channels", "Multichannel image required");
+		
+		/* suite AutoCrop constructeur */ 
+		System.out.println("Canal a utiliser pour seuiller l'image = " + channelToComputeThreshold);
+		
+		if (this.rawImg.getBitDepth() > 8) {
+			System.out.println("ImgSeg = getImage(Thresholding.contrastAnd8bits(ChannelToComputeThreshold))");
+			//this.imageSeg =
+			//	Thresholding.contrastAnd8bits(getImageChannel(this.autocropParameters.getChannelToComputeThreshold()));
+			this.imageSeg = contrastAnd8bits(currentImage[channelToComputeThreshold]);
+		} else {
+			System.out.println("ImgSeg = getImage(ChannelToComputeThreshold)");
+			//this.imageSeg = 
+			//	getImageChannel(this.autocropParameters.getChannelToComputeThreshold());
+			this.imageSeg = currentImage[channelToComputeThreshold];
+		}
+		
+		/** AutoCropCalling.Suite runFile()
+		 * AutoCrop.thresholdKernels();
+		 * Realise un seuillage OTSU + Segmentation 
+		 */
+		thresholdKernels();
+	}
+	
+	/**
+	 * Method computing OTSU threshold and creating segmented image from this threshold. 
+	 * Before OTSU threshold a Gaussian Blur is applied (case of anisotropic voxels)
+	 * 
+	 * TODO : add case where voxel are not anisotropic for Gaussian Blur Case where OTSU threshold 
+	 * is under 20 computation using only half of last slice (useful in case of top slice with lot 
+	 * of noise) If OTSU threshold is still under 20 threshold default threshold value is 20.
+	 */	
+	public void thresholdKernels() {
+		LOGGER.info("Thresholding kernels.");
+		if (this.imageSeg == null) {
+			return;
+		}
+		System.out.println("thresholdKernels()");
+		GaussianBlur3D.blur(this.imageSeg, 0.5, 0.5, 1);
+		// Autothresholding methods
+		//  Calculates and returns a threshold using the specified method and 256 bin histogram. 
+		//int thresh = Thresholding.computeOTSUThreshold(this.imageSeg);
+		AutoThresholder autoThresholder = new AutoThresholder();
+		ImageStatistics imageStatistics = new StackStatistics(this.imageSeg);
+		int[]           tHistogram      = imageStatistics.histogram;
+		int thresh = autoThresholder.getThreshold(AutoThresholder.Method.Otsu, tHistogram);
+		
+		System.out.println("Thresholding kernels ImgSeg Threshold = " + thresh);
+	
+		/*
+		if (thresh < this.autocropParameters.getThresholdOTSUComputing()) {
+			ImagePlus imp2;
+			if (autocropParameters.getSlicesOTSUComputing() == 0) {
+				this.sliceUsedForOTSU =
+						"Start:" + this.imageSeg.getStackSize() / 2 + "-" + this.imageSeg.getStackSize();
+				imp2 = new Duplicator().run(this.imageSeg,
+				                            this.imageSeg.getStackSize() / 2,
+				                            this.imageSeg.getStackSize());
+			} else {
+				this.sliceUsedForOTSU = "Start:" +
+				                        this.autocropParameters.getSlicesOTSUComputing() +
+				                        "-" +
+				                        this.imageSeg.getStackSize();
+				imp2 = new Duplicator().run(this.imageSeg,
+				                            this.autocropParameters.getSlicesOTSUComputing(),
+				                            this.imageSeg.getStackSize());
+			}
+			int thresh2 = Thresholding.computeOTSUThreshold(imp2);
+			if (thresh2 < this.autocropParameters.getThresholdOTSUComputing()) {
+				thresh = this.autocropParameters.getThresholdOTSUComputing();
+				this.defaultThreshold = true;
+			} else {
+				thresh = thresh2;
+			}
+		}
+		this.otsuThreshold = thresh;
+		this.imageSeg = this.generateSegmentedImage(this.imageSeg, thresh);
+		*/
 	}
 
+	/**
+	 * TODO COMMENT !!!! 2D 3D
+	 *
+	 * @param imagePlusInput
+	 *
+	 * @return
+	 */
+	public ImagePlus contrastAnd8bits(ImagePlus imagePlusInput) {
+		/* Thresholding.contrastAnd8bits */ 
+		System.out.println("Thresholding.contrastAnd8bits");
+		
+		ContrastEnhancer enh = new ContrastEnhancer();
+		enh.setNormalize(true);
+		enh.setUseStackHistogram(true);
+		enh.setProcessStack(true);
+		enh.stretchHistogram(imagePlusInput, 0.05);
+		StackStatistics statistics = new StackStatistics(imagePlusInput);
+		imagePlusInput.setDisplayRange(statistics.min, statistics.max);
+		
+		if (imagePlusInput.getNSlices() > 1) { // 3D
+			System.out.println("Thresholding.contrastAnd8bits STACK CONVERTER -> GRAY8");
+			StackConverter stackConverter = new StackConverter(imagePlusInput);
+			stackConverter.convertToGray8();
+		} else { // 2D
+			System.out.println("Thresholding.contrastAnd8bits IMAGE CONVERTER -> GRAY8");
+			ImageConverter imageConverter = new ImageConverter(imagePlusInput);
+			imageConverter.convertToGray8();
+		}
+		return imagePlusInput;		
+	}
+	
+	/**
+	 * Method to check multichannel and initialising channelNumbers variable
+	 */
+	public ImagePlus[] openBFImagePlus(String path) {
+		ImagePlus[] imps = null;
+		// Bio-Formats ImporterOptions controle les otions d'ouverture des images
+		System.out.println("Bio-Formats ImporterOptions");
+		
+	    try {
+	     System.out.println("Trying LOCI Import Image in AutoCrop constructor");
+	     // Bio-Formats Import Options
+	     ImporterOptions options = new ImporterOptions();
+	     //options.setId(this.imageFilePath);
+	     options.setId("‪C:\\Users\\frede\\Desktop\\2013-01-18-crwn12-102_GC1.tif");
+	     options.setAutoscale(false);
+	     //options.setStackFormat(ImporterOptions.VIEW_HYPERSTACK);
+	     //options.setStackOrder(ImporterOptions.ORDER_XYCZT);
+	     //options.setColorMode(ImporterOptions.COLOR_MODE_DEFAULT);
+	     //options.setColorMode(ImporterOptions.COLOR_MODE_COMPOSITE);
+	     //options.setCrop(true);
+	     //options.setVirtual(virtual);
+	     //options.setGroupFiles(true);
+	     //imps = BF.openImagePlus(options); // ou BF.openImagePlus(this.imageFilePath);
+	     imps = BF.openImagePlus(this.imageFilePath);
+	    }
+	    catch (FormatException e) {
+	    	IJ.error("Sorry, an error occurred: " + e.getMessage());
+		}
+		catch (IOException e) {
+			IJ.error("Sorry, an error occurred: " + e.getMessage());
+		}
+	    return imps;
+	}
+	
+	/**
+	 * Method to get specific channel to compute OTSU threshold
+	 * @param channelNumber Number of channel to compute OTSU for crop
+	 * @return image of specific channel
+	 */
+	public ImagePlus getImageChannel(int channelNumber) throws IOException, FormatException {
+		ImagePlus[] currentImage = BF.openImagePlus(this.imageFilePath);
+		currentImage = ChannelSplitter.split(currentImage[0]);
+		return currentImage[channelNumber];
+	}
+	
 	/**
 	 * AutoCrop.java : Charger une image sans bio-format
 	 */
